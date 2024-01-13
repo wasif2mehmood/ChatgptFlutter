@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:chatgptapp/chat_window.dart';
 import 'package:chat_gpt_sdk/chat_gpt_sdk.dart';
-
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class chat extends StatefulWidget {
   const chat({Key? key}) : super(key: key);
@@ -19,66 +19,67 @@ class _chatState extends State<chat> {
   StreamSubscription? subscription;
 
   @override
-  void initState() {
-    openAI = OpenAI.instance.build(
-        token: "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",
-        baseOption: HttpSetup(receiveTimeout: const Duration(seconds: 5)));
-    super.initState();
-  }
+void initState() {
+  super.initState();
+  initOpenAI();
+}
+
+Future<void> initOpenAI() async {
+  await dotenv.load(fileName: ".env");
+  openAI = OpenAI.instance.build(
+    token: dotenv.env['OPENAI_API_KEY'],
+    baseOption: HttpSetup(receiveTimeout: const Duration(seconds: 5))
+  );
+}
 
   @override
   void dispose() {
     super.dispose();
   }
 
-
-void sendMessage() async {
-  try {
-    if (_controller.text.isEmpty) return;
-    setState(() {
-      messages.add(
-        Message(
-          text: _controller.text,
-          sender: "user",
-        ),
-      );
-    });
-
-    final request = ChatCompleteText(
-      messages: [
-        Messages(
-          role: Role.user,
-          content: _controller.text,
-          name: "get_current_weather"
-        )
-      ],
-      maxToken: 200,
-      model: GptTurbo0631Model()
-    );
-
-    ChatCTResponse? response = await openAI?.onChatCompletion(request: request);
-    if (response != null) {
+  void sendMessage() async {
+    try {
+      if (_controller.text.isEmpty) return;
       setState(() {
         messages.add(
           Message(
-            text: response.choices?.first?.message?.content ?? '',
+            text: _controller.text,
+            sender: "user",
+          ),
+        );
+      });
+
+      final request = ChatCompleteText(messages: [
+        Messages(
+            role: Role.user,
+            content: _controller.text,
+            name: "get_current_weather")
+      ], maxToken: 200, model: GptTurbo0631Model());
+
+      ChatCTResponse? response =
+          await openAI?.onChatCompletion(request: request);
+      if (response != null) {
+        setState(() {
+          messages.add(
+            Message(
+              text: response.choices?.first?.message?.content ?? '',
+              sender: "bot",
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      setState(() {
+        messages.add(
+          Message(
+            text: e.toString(),
             sender: "bot",
           ),
         );
       });
     }
-  } catch (e) {
-    setState(() {
-      messages.add(
-        Message(
-          text: 'Pakistan was formed in 1947 founded by Quaid-e-Azam Muhammad Ali Jinnah',
-          sender: "bot",
-        ),
-      );
-    });
+    _controller.clear();
   }
-  _controller.clear();
-}
 
   @override
   Widget build(BuildContext context) {
